@@ -1,4 +1,25 @@
-import type { MetaFunction } from "@remix-run/cloudflare";
+import {
+  defer,
+  type LoaderFunctionArgs,
+  type MetaFunction,
+} from "@remix-run/cloudflare";
+import { Await, useLoaderData } from "@remix-run/react";
+import { Suspense } from "react";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const heading = "Welcome to Remix on Cloudflare!";
+
+  // parse the search params for `?q=`
+  const url = new URL(request.url);
+  const query = url.searchParams.get("q");
+
+  const message = getMessage(query)
+
+  return defer({
+    heading,
+    message,
+  });
+}
 
 export const meta: MetaFunction = () => {
   return [
@@ -11,9 +32,17 @@ export const meta: MetaFunction = () => {
 };
 
 export default function Index() {
+  const { heading, message } = useLoaderData<typeof loader>();
   return (
     <div className="font-sans p-4">
-      <h1 className="text-3xl">Welcome to Remix on Cloudflare</h1>
+      <h1 className="text-3xl">{heading}</h1>
+
+      <Suspense fallback={<p className="mt-4">Loading...</p>}>
+        <Await resolve={message}>
+          {(message) => <p className="mt-4">{message}</p>}
+        </Await>
+      </Suspense>
+
       <ul className="list-disc mt-4 pl-6 space-y-2">
         <li>
           <a
@@ -38,4 +67,23 @@ export default function Index() {
       </ul>
     </div>
   );
+}
+
+const getMessage = async (query: string | null) => {
+  // sleep 2 seconds
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+
+  if (!query) {
+    return "No query provided.";
+  }
+
+  if ("not-found" === query) {
+    // NOT WORKING
+    throw new Response(null, {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
+
+  return `You searched for "${query}".`;
 }
